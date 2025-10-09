@@ -1,0 +1,73 @@
+services:
+  # 1. Broker de Kafka:
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka-broker-container
+    ports:
+      - "9092:9092"
+    environment:
+      # Definir el Cluster ID (lo requiere KRaft)
+      KAFKA_CLUSTER_ID: "abcdefghijklmnopqrstuv" 
+      
+      # Definición de Roles y Nodos
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      
+      # Especifica qué listener usar para las comunicaciones internas del controlador
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER 
+      # Listeners (Interno y Publicitario)
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # Para que el productor pueda conectarse
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092 
+      # Esto le dice a Kafka que PLAINTEXT y CONTROLLER usan el protocolo PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      
+      # Configuración de Quorum
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      
+      # Directorio de datos
+      KAFKA_LOG_DIRS: /var/lib/kafka/data 
+      
+      # Le dice al contenedor que formatee si es necesario y luego inicie
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093 # Asegura los listeners
+      KAFKA_OPTS: "-Dkafka.cluster.id=abcdefghijklmnopqrstuv" # Opción adicional para asegurar el ID
+    
+    volumes:
+      # Usar un subdirectorio para evitar conflictos con el proceso de inicio
+      - ./kafka-data:/var/lib/kafka/data
+      
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Contenedor de Grafana:
+  grafana:
+    image: grafana/grafana-enterprise:latest
+    container_name: grafana-container
+    ports:
+      - "3000:3000"
+    volumes:
+      # Montaje para persistencia de datos
+      - ./grafana-data:/var/lib/grafana
+      # Montaje para instalar el plugin dalelane/grafana-kafka-datasource manualmente después
+      - ./grafana/plugins:/var/lib/grafana/plugins
+    environment:
+      # Credenciales de inicio de sesión:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    # Asegura que Kafka esté listo antes de que Grafana intente conectarse
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # 3. Contenedor del Producer (Python)
+  producer:
+    build:
+      context: ./producer
+    container_name: kafka-producer-container
+    # Asegura que el broker de Kafka esté listo
+    depends_on:
+      kafka:
+        condition: service_healthy

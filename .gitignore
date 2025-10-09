@@ -1,0 +1,7 @@
+Capa*/
+grafana/
+grafana-data/
+kafka-data/
+kafka_2.13-4.1.0/
+kafka_2.13-4.1.0.tgz
+tesis_venv/

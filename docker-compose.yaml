@@ -67,7 +67,23 @@ services:
     build:
       context: ./producer
     container_name: kafka-producer-container
+    volumes:
+      - ./producer:/app
     # Asegura que el broker de Kafka esté listo
     depends_on:
       kafka:
         condition: service_healthy
+
+  # 4. Contenedor del Consumer (Python)
+  # consumer:
+  #   build:
+  #     context: ./consumer
+  #   container_name: kafka-consumer-container
+  #   volumes:
+  #     - ./consumer:/app
+  #   # Asegura que el broker de Kafka esté listo
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
+  #   # stdin_open: true
+  #   # tty: true

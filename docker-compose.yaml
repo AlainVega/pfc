@@ -1,80 +1,112 @@
 services:
-  # 1. Broker de Kafka:
+  # Broker de Kafka (KRaft) con JMX activado
   kafka:
     image: apache/kafka:latest
     container_name: kafka-broker-container
     ports:
       - "9092:9092"
+      - "9999:9999"   # Puerto JMX para métricas
     environment:
-      # Definir el Cluster ID (lo requiere KRaft)
-      KAFKA_CLUSTER_ID: "abcdefghijklmnopqrstuv" 
-      
-      # Definición de Roles y Nodos
+      # Identidad del cluster (KRaft)
+      KAFKA_CLUSTER_ID: "abcdefghijklmnopqrstuv"
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      
-      # Especifica qué listener usar para las comunicaciones internas del controlador
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER 
-      # Listeners (Interno y Publicitario)
+
+      # Listeners
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      # Para que el productor pueda conectarse
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092 
-      # Esto le dice a Kafka que PLAINTEXT y CONTROLLER usan el protocolo PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      
-      # Configuración de Quorum
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      # Logs
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       
-      # Directorio de datos
-      KAFKA_LOG_DIRS: /var/lib/kafka/data 
-      
-      # Le dice al contenedor que formatee si es necesario y luego inicie
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093 # Asegura los listeners
-      KAFKA_OPTS: "-Dkafka.cluster.id=abcdefghijklmnopqrstuv" # Opción adicional para asegurar el ID
-    
+      # Extra: asegurar listeners
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+
+      # JMX HABILITADO PARA EXPORTER
+      KAFKA_OPTS: -javaagent:/opt/jmx_prometheus_javaagent.jar=9999:/opt/prom-jmx-agent-config.yml
+
     volumes:
-      # Usar un subdirectorio para evitar conflictos con el proceso de inicio
       - ./kafka-data:/var/lib/kafka/data
-      
+      - ./prom-jmx-agent-config.yml:/opt/prom-jmx-agent-config.yml
+      - ./jmx_prometheus_javaagent.jar:/opt/jmx_prometheus_javaagent.jar
+
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # 2. Contenedor de Grafana:
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-container
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      # jmx-exporter:
+        # condition: service_started
+      kafka:
+        condition: service_started
+
+  # Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: loki-container
+    ports:
+    - "3100:3100" 
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+    - ./loki-config.yaml:/etc/loki/local-config.yaml
+
+  # Promtail (Agente de Logs)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail-container
+    volumes:
+    - ./promtail-config.yml:/etc/promtail/config.yml
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_started
+
+  # Grafana
   grafana:
     image: grafana/grafana-enterprise:latest
     container_name: grafana-container
     ports:
       - "3000:3000"
     volumes:
-      # Montaje para persistencia de datos
       - ./grafana-data:/var/lib/grafana
-      # Montaje para instalar el plugin dalelane/grafana-kafka-datasource manualmente después
       - ./grafana/plugins:/var/lib/grafana/plugins
     environment:
-      # Credenciales de inicio de sesión:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-    # Asegura que Kafka esté listo antes de que Grafana intente conectarse
     depends_on:
-      kafka:
-        condition: service_healthy
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
 
-  # 3. Contenedor del Producer (Python)
+  # Producer (Python)
   producer:
     build:
       context: ./producer
     container_name: kafka-producer-container
     volumes:
       - ./producer:/app
-    # Asegura que el broker de Kafka esté listo
     depends_on:
       kafka:
         condition: service_healthy
 
-  # 4. Contenedor del Consumer (Python)
+
+  # Consumer (Python)
   # consumer:
   #   build:
   #     context: ./consumer

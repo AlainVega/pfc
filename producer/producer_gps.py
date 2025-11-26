@@ -7,6 +7,13 @@ import numpy as np
 import os
 import threading
 import socket
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 conf = {
     'bootstrap.servers': 'kafka:9092', 
@@ -27,7 +34,7 @@ gdf = gpd.read_file(file_path, driver='geojson')
 # %%
 
 # Número de puntos GPS a simular:
-n_points = 100
+n_points = 500
 loop_inf = True
 
 def enviar_ubicacion_colectivo(linea: str, id_: str, empresa: str, geometry, n_points=5, loop_inf=True):
@@ -57,7 +64,7 @@ def enviar_ubicacion_colectivo(linea: str, id_: str, empresa: str, geometry, n_p
 
                 producer.produce(topic, value=json.dumps(mensaje)) # enviar mensaje
                 producer.poll(0) # procesa callbacks
-                time.sleep(5)  # velocidad de simulación
+                time.sleep(1)  # velocidad de simulación
     else:
         for idx, pt in enumerate(points):
             mensaje = {
@@ -73,6 +80,7 @@ def enviar_ubicacion_colectivo(linea: str, id_: str, empresa: str, geometry, n_p
             producer.produce(topic, value=json.dumps(mensaje)) # enviar mensaje
             producer.poll(0) # procesa callbacks
             time.sleep(5)  # velocidad de simulación
+            logger.info("GPS_SENT_OK: Ubicación enviada.")
 
 # %%
 # Crear y lanzar un hilo por cada colectivo

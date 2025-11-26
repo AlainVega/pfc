@@ -7,4 +7,4 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Comando por defecto al iniciar el contenedor
-CMD ["python", "producer_gps.py"]
+CMD ["python", "-u", "producer_gps.py"]

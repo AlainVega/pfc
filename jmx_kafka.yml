@@ -1,0 +1,22 @@
+startDelaySeconds: 5
+hostPort: kafka:9999
+
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(.+)><>Count'
+    name: kafka_server_brokertopicmetrics_$1_total
+    type: COUNTER
+
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(.+)><>OneMinuteRate'
+    name: kafka_server_brokertopicmetrics_$1_1min
+    type: GAUGE
+
+  - pattern: 'kafka.network<type=RequestMetrics, name=RequestsPerSec, request=(.+)><>Count'
+    name: kafka_network_requestmetrics_$1_total
+    type: COUNTER
+
+  - pattern: 'kafka.controller<type=KafkaController, name=(.+)><>(Value|Count)'
+    name: kafka_controller_$1
+    type: GAUGE

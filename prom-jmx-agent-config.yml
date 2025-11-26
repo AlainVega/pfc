@@ -1,0 +1,55 @@
+# Esta configuración es la del JMX Exporter, no la de Prometheus.
+# Aquí solo van las reglas para mapear JMX. El puerto de escucha
+# (9999) y la configuración ya están en KAFKA_OPTS.
+
+startDelaySeconds: 5 # Espera 5 segundos antes del primer scrape
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # ==================================
+  # 1. JVM Metrics (Heap, CPU, GC)
+  # ==================================
+  - pattern: "java.lang<type=GarbageCollector, name=(.+),><CollectionCount>(\\w+)"
+    name: jvm_gc_collection_count_total
+    type: COUNTER
+    labels:
+      gc: "$1"
+  - pattern: "java.lang<type=MemoryPool, name=(.+),><Usage>(\\w+)"
+    name: jvm_memory_pool_usage
+    type: GAUGE
+    labels:
+      pool: "$1"
+
+  # ==================================
+  # 2. Kafka Broker Topic Metrics (Throughput)
+  # ==================================
+  # Bytes In/Out, Messages In/Out (Contadores)
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(.+)><>Count'
+    name: kafka_server_brokertopicmetrics_$1_total
+    type: COUNTER
+
+  # Tasas de Bytes/Messages (Rates)
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(.+)><>OneMinuteRate'
+    name: kafka_server_brokertopicmetrics_$1_1min_rate
+    type: GAUGE
+
+  # ==================================
+  # 3. Request/Network Metrics (Latency)
+  # ==================================
+  # Request rate and response rate (Contadores)
+  - pattern: 'kafka.network<type=(.+), name=(.+), (.+)perSec\>(Count|Value)'
+    name: kafka_network_$1_$2_total
+    type: COUNTER
+
+  # Latency (P99, Average)
+  - pattern: 'kafka.network<type=(.+), name=(.+), (.+)time\>(Value|Count)'
+    name: kafka_network_$1_$2_$3
+
+  # ==================================
+  # 4. Controller Metrics (KRaft Health)
+  # ==================================
+  # Active Controller ID, Leader Status
+  - pattern: "kafka.controller<type=KafkaController, name=(.+)><>Value"
+    name: kafka_controller_$1
+    type: GAUGE

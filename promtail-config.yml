@@ -9,12 +9,52 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: docker-logs
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: docker-logs
-          __path__: /var/lib/docker/containers/*/*log
+  - job_name: docker-service-discovery
+    
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*kafka-broker.*|/.*kafka-producer.*|/.*promtail.*|/.*loki.*|/.*prometheus.*|.*grafana.*
+        action: keep
+
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*kafka-broker.*
+        target_label: job
+        replacement: kafka-broker
+        action: replace
+      
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*kafka-producer.*
+        target_label: job
+        replacement: kafka-producer
+        action: replace
+      
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*promtail.*
+        target_label: job
+        replacement: promtail
+        action: replace
+
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*loki.*
+        target_label: job
+        replacement: loki
+        action: replace
+      
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*prometheus-container.*
+        target_label: job
+        replacement: prometheus
+        action: replace
+
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*grafana.*
+        target_label: job
+        replacement: grafana
+        action: replace
+        
     pipeline_stages:
       - docker: {}

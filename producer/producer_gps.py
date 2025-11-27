@@ -65,6 +65,7 @@ def enviar_ubicacion_colectivo(linea: str, id_: str, empresa: str, geometry, n_p
                 producer.produce(topic, value=json.dumps(mensaje)) # enviar mensaje
                 producer.poll(0) # procesa callbacks
                 time.sleep(1)  # velocidad de simulación
+                logger.info("GPS_SENT_OK: Ubicación enviada.")
     else:
         for idx, pt in enumerate(points):
             mensaje = {

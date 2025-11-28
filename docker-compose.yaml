@@ -67,6 +67,8 @@ services:
   promtail:
     image: grafana/promtail:latest
     container_name: promtail-container
+    ports:
+      - "9080:9080" 
     volumes:
     - ./promtail-config.yml:/etc/promtail/config.yml
     - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -93,6 +95,38 @@ services:
         condition: service_started
       loki:
         condition: service_started
+
+  # Node Exporter para metricas del Host
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter-container
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+
+  # cAdvisor para metricas detalladas de contenedores
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor-container
+    ports:
+      - "8080:8080" 
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    depends_on:
+      - kafka 
+    restart: unless-stopped
 
   # Producer (Python)
   producer:

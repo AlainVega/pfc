@@ -17,7 +17,7 @@ scrape_configs:
         
     relabel_configs:
       - source_labels: ['__meta_docker_container_name']
-        regex: /.*kafka-broker.*|/.*kafka-producer.*|/.*promtail.*|/.*loki.*|/.*prometheus.*|.*grafana.*
+        regex: /.*kafka-broker.*|/.*kafka-producer.*|/.*promtail.*|/.*loki.*|/.*prometheus.*|.*grafana.*|/.*cadvisor.*|/.*node-exporter.*
         action: keep
 
       - source_labels: ['__meta_docker_container_name']
@@ -45,7 +45,7 @@ scrape_configs:
         action: replace
       
       - source_labels: ['__meta_docker_container_name']
-        regex: /.*prometheus-container.*
+        regex: /.*prometheus.*
         target_label: job
         replacement: prometheus
         action: replace
@@ -54,6 +54,18 @@ scrape_configs:
         regex: /.*grafana.*
         target_label: job
         replacement: grafana
+        action: replace
+
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*cadvisor.*
+        target_label: job
+        replacement: cadvisor
+        action: replace
+      
+      - source_labels: ['__meta_docker_container_name']
+        regex: /.*node-exporter.*
+        target_label: job
+        replacement: node-exporter
         action: replace
         
     pipeline_stages:
